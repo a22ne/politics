@@ -1,3 +1,11 @@
+
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+try:
+    from database.db_config import get_db_engine
+except ImportError:
+    from db_config import get_db_engine
 import os
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, Float
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
@@ -77,9 +85,9 @@ class Opinion(Base):
     issue_category = Column(String(50), nullable=True)
     party_stance = Column(String(50), nullable=True)
 
-def init_db(db_path='sqlite:///database/political_data.db'):
+def init_db():
     os.makedirs(os.path.dirname(db_path.replace('sqlite:///', '')), exist_ok=True)
-    engine = create_engine(db_path)
+    engine = get_db_engine()
     # Drop all first for this major migration
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)

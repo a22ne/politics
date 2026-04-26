@@ -9,3 +9,5 @@ lxml
 feedparser
 wordcloud
 duckduckgo-search
+psycopg2-binary
+python-dotenv

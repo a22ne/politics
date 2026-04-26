@@ -1,3 +1,11 @@
+
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+try:
+    from database.db_config import get_db_engine
+except ImportError:
+    from db_config import get_db_engine
 import sys
 import os
 import requests
@@ -11,8 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database.db_setup import Location, Opinion
 
 def get_db_session():
-    db_path = 'sqlite:///database/political_data.db'
-    engine = create_engine(db_path)
+    engine = get_db_engine()
     Session = sessionmaker(bind=engine)
     return Session()
 

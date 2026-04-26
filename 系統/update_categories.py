@@ -1,3 +1,11 @@
+
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+try:
+    from database.db_config import get_db_engine
+except ImportError:
+    from db_config import get_db_engine
 import sys
 import os
 from sqlalchemy import create_engine
@@ -9,8 +17,7 @@ from scraper.categorizer import categorize_content
 
 def update_categories():
     print("開始回溯更新現有資料的分類標籤...")
-    db_path = 'sqlite:///database/political_data.db'
-    engine = create_engine(db_path)
+    engine = get_db_engine()
     Session = sessionmaker(bind=engine)
     session = Session()
     

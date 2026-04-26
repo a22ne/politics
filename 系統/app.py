@@ -162,10 +162,11 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
+from database.db_config import get_db_engine
+
 @st.cache_resource
 def get_engine():
-    db_path = f"sqlite:///{os.path.join(BASE_DIR, 'database', 'political_data.db')}"
-    return create_engine(db_path)
+    return get_db_engine()
 
 def load_data(query, engine):
     try:
