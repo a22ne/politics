@@ -11,3 +11,4 @@ wordcloud
 duckduckgo-search
 psycopg2-binary
 python-dotenv
+pg8000

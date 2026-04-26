@@ -13,9 +13,11 @@ if not DATABASE_URL:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'database', 'political_data.db')}"
 
-# Note: Supabase sometimes provides `postgres://` which SQLAlchemy 1.4+ deprecated. Needs to be `postgresql://`
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+pg8000://", 1)
+    elif DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+pg8000://", 1)
 
 def get_db_engine():
     return create_engine(DATABASE_URL)
