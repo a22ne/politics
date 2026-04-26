@@ -1,0 +1,11 @@
+streamlit
+pandas
+beautifulsoup4
+requests
+schedule
+sqlalchemy
+plotly
+lxml
+feedparser
+wordcloud
+duckduckgo-search
