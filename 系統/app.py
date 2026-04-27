@@ -234,7 +234,12 @@ def main():
         if selected_district_name == "所有行政區":
             dist_ids_query = f"SELECT id FROM locations WHERE parent_id={loc_id_to_query}"
             dist_ids_df = load_data(dist_ids_query, engine)
-            all_loc_ids = [loc_id_to_query] + dist_ids_df['id'].tolist() if not dist_ids_df.empty else [loc_id_to_query]
+            if not dist_ids_df.empty:
+                valid_ids = [int(x) for x in dist_ids_df['id'].dropna().tolist()]
+                all_loc_ids = [loc_id_to_query] + valid_ids
+            else:
+                all_loc_ids = [loc_id_to_query]
+            
             loc_tuple = tuple(all_loc_ids) if len(all_loc_ids) > 1 else f"({all_loc_ids[0]})"
             where_clauses.append(f"location_id IN {loc_tuple}")
         else:
@@ -311,7 +316,8 @@ def main():
         elif elec_type == "市議員":
             dist_ids_df = load_data(f"SELECT id, name FROM locations WHERE parent_id={county_options[selected_county_name]}", engine)
             if not dist_ids_df.empty:
-                dist_ids_tuple = tuple(dist_ids_df['id'].tolist()) if len(dist_ids_df) > 1 else f"({dist_ids_df['id'].iloc[0]})"
+                valid_ids = [int(x) for x in dist_ids_df['id'].dropna().tolist()]
+                dist_ids_tuple = tuple(valid_ids) if len(valid_ids) > 1 else f"({valid_ids[0]})" if valid_ids else "(0)"
                 councilor_df = load_data(f"""
                     SELECT l.name as district_name, e.candidate_name, e.party, e.votes 
                     FROM election_history e 
