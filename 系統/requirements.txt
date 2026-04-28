@@ -8,6 +8,7 @@ plotly
 lxml
 feedparser
 wordcloud
+ddgs
 duckduckgo-search
 psycopg2-binary
 python-dotenv

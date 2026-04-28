@@ -14,9 +14,11 @@ if not DATABASE_URL:
     DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'database', 'political_data.db')}"
 
 if DATABASE_URL:
+    # 統一使用 postgresql+pg8000（純 Python，不依賴 psycopg2 二進位檔）
     if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+pg8000://", 1)
+    elif DATABASE_URL.startswith("postgresql://") and "+pg8000" not in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+pg8000://", 1)
 
 def get_db_engine():
-    # 使用 psycopg2，避免 pg8000 的死鎖問題
     return create_engine(DATABASE_URL)

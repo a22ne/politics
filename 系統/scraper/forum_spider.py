@@ -1,7 +1,16 @@
 
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# 強制從專案根目錄載入 .env
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, _ROOT)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(_ROOT, '.env'), override=True)
+except ImportError:
+    pass
+
 try:
     from database.db_config import get_db_engine
 except ImportError:
