@@ -6,84 +6,89 @@ try:
     from database.db_config import get_db_engine
 except ImportError:
     from db_config import get_db_engine
-import sys
-import os
 import requests
-from bs4 import BeautifulSoup
 import feedparser
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 import datetime
+from sqlalchemy import text
 
-# Add project root to sys.path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database.db_setup import Location, Politician, News
-
-def get_db_session():
-    engine = get_db_engine()
-    Session = sessionmaker(bind=engine)
-    return Session()
+def get_engine():
+    return get_db_engine()
 
 def scrape_yahoo_news():
     print(f"[{datetime.datetime.now()}] 開始抓取政治新聞...")
-    session = get_db_session()
-    
-    # Get all locations
-    locations = session.query(Location).all()
-    loc_dict = {loc.name: loc.id for loc in locations}
-    
+    engine = get_engine()
+
+    # 分類器
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from scraper.categorizer import categorize_content
+
+    # Get all locations via raw SQL
+    with engine.connect() as conn:
+        result = conn.execute(text("SELECT id, name FROM locations WHERE name IS NOT NULL"))
+        loc_dict = {row[1]: row[0] for row in result.fetchall()}
+
     # 政治新聞 RSS (Yahoo)
     rss_url = "https://tw.news.yahoo.com/rss/politics"
-    feed = feedparser.parse(rss_url)
-    
+    try:
+        feed = feedparser.parse(rss_url)
+    except Exception as e:
+        print(f"RSS 讀取失敗: {e}")
+        return
+
     added_count = 0
     for entry in feed.entries:
         title = entry.title
         link = entry.link
-        # parse publish time (RFC 822)
         try:
             pub_time = datetime.datetime(*entry.published_parsed[:6])
         except:
             pub_time = datetime.datetime.utcnow()
-            
+
         summary = entry.get('summary', '')
-        
+
         # Check if already exists
-        if session.query(News).filter_by(url=link).first():
-            continue
-            
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT id FROM news WHERE url = :url"), {"url": link})
+            if result.fetchone():
+                continue
+
         # Determine location
         loc_id = None
         for loc_name, l_id in loc_dict.items():
-            if loc_name in title or loc_name in summary:
+            if loc_name and (loc_name in title or loc_name in summary):
                 if loc_name != "全國":
                     loc_id = l_id
                     break
-        
-        # If no specific county, assign to "全國"
+
         if not loc_id:
             loc_id = loc_dict.get("全國")
-            
+
         # Categorize
         combined_text = title + " " + summary
-        from scraper.categorizer import categorize_content
         issue_cat, party_cat = categorize_content(combined_text)
-            
-        news_item = News(
-            source="Yahoo新聞",
-            title=title,
-            content=summary,
-            url=link,
-            publish_time=pub_time,
-            location_id=loc_id,
-            issue_category=issue_cat,
-            party_stance=party_cat
-        )
-        session.add(news_item)
-        added_count += 1
-        
-    session.commit()
-    session.close()
+
+        # Insert via raw SQL (bypasses ORM identity key issue)
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("""
+                    INSERT INTO news (source, title, content, url, publish_time, location_id, issue_category, party_stance)
+                    VALUES (:source, :title, :content, :url, :pub_time, :location_id, :issue_cat, :party_cat)
+                    ON CONFLICT (url) DO NOTHING
+                """), {
+                    "source": "Yahoo新聞",
+                    "title": title[:200],
+                    "content": summary[:2000] if summary else "",
+                    "url": link,
+                    "pub_time": pub_time,
+                    "location_id": loc_id,
+                    "issue_cat": issue_cat,
+                    "party_cat": party_cat
+                })
+                conn.commit()
+                added_count += 1
+            except Exception as e:
+                print(f"插入失敗: {e}")
+
     print(f"[{datetime.datetime.now()}] 新聞抓取完成，共新增 {added_count} 筆資料。")
 
 if __name__ == "__main__":

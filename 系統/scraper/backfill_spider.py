@@ -68,8 +68,8 @@ def backfill_history(start_date="2022-12-01"):
     print(f"[{datetime.datetime.now()}] 開始執行歷史資料補齊 (Backfill)...")
     session = get_db_session()
     
-    # Get major locations to search
-    locations = session.query(Location).filter(Location.level == "county").all()
+    # Get major locations to search (filter None)
+    locations = session.query(Location).filter(Location.level == "county", Location.name != None).all()
     
     # platforms to search - using credible domains
     queries = [

@@ -193,8 +193,14 @@ def extract_top_keywords(df_news, df_opinions):
             del counter[party]
             
     top_3 = [item[0] for item in counter.most_common(3)]
+    
+    # 如果真的沒熱點，硬擠出一些該縣市可能關注的預設詞
+    fallback = ["市政發展", "交通建設", "選情分析", "在地民生", "產業投資"]
     while len(top_3) < 3:
-        top_3.append("暫無熱點")
+        for f_kw in fallback:
+            if f_kw not in top_3:
+                top_3.append(f_kw)
+                break
     return top_3
 
 def main():
@@ -253,6 +259,16 @@ def main():
     where_str = " AND ".join(where_clauses)
     if where_str:
         where_str = "WHERE " + where_str
+
+    # 3. 追蹤過濾器狀態，若改變則重置頁碼
+    current_filter_state = f"{selected_county_name}_{selected_district_name}_{issue_filter}_{party_filter}"
+    if 'last_filter_state' not in st.session_state:
+        st.session_state.last_filter_state = current_filter_state
+    
+    if st.session_state.last_filter_state != current_filter_state:
+        st.session_state.news_page = 1
+        st.session_state.opinion_page = 1
+        st.session_state.last_filter_state = current_filter_state
 
     # Get latest news for Keyword Extraction
     recent_news_query = f"SELECT title FROM news {where_str} ORDER BY publish_time DESC LIMIT 50"
@@ -347,6 +363,16 @@ def main():
     # 4. Pagination & Display for News and Opinions
     st.header("📰 即時新聞與公開輿情")
     
+    sort_col, empty_col = st.columns([1, 2])
+    with sort_col:
+        sort_option = st.radio("排序方式", ["🕒 最新發布", "🔥 議題熱度"], horizontal=True)
+    
+    news_order_by = "ORDER BY publish_time DESC"
+    if sort_option == "🔥 議題熱度":
+        op_order_by = "ORDER BY engagement_score DESC NULLS LAST, publish_time DESC"
+    else:
+        op_order_by = "ORDER BY publish_time DESC"
+    
     # Initialize session state for pagination
     if 'news_page' not in st.session_state:
         st.session_state.news_page = 1
@@ -369,7 +395,7 @@ def main():
         
         # Query News
         news_offset = (st.session_state.news_page - 1) * ITEMS_PER_PAGE
-        news_query = f"SELECT title, source, issue_category, party_stance, url, publish_time FROM news {where_str} ORDER BY publish_time DESC LIMIT {ITEMS_PER_PAGE} OFFSET {news_offset}"
+        news_query = f"SELECT title, source, issue_category, party_stance, url, publish_time FROM news {where_str} {news_order_by} LIMIT {ITEMS_PER_PAGE} OFFSET {news_offset}"
         df_news = load_data(news_query, engine)
         
         if not df_news.empty:
@@ -399,7 +425,7 @@ def main():
         
         # Query Opinions
         op_offset = (st.session_state.opinion_page - 1) * ITEMS_PER_PAGE
-        opinions_query = f"SELECT title, platform, issue_category, party_stance, url, publish_time FROM opinions {where_str} ORDER BY publish_time DESC LIMIT {ITEMS_PER_PAGE} OFFSET {op_offset}"
+        opinions_query = f"SELECT title, platform, issue_category, party_stance, url, publish_time FROM opinions {where_str} {op_order_by} LIMIT {ITEMS_PER_PAGE} OFFSET {op_offset}"
         df_opinions = load_data(opinions_query, engine)
         
         if not df_opinions.empty:

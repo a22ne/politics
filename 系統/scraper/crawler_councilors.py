@@ -67,6 +67,11 @@ def populate_councilors():
     
     all_records = []
     
+    # 一次性刪除全台舊的市議員資料，避免在迴圈內反覆操作造成資料庫死鎖 (Deadlock)
+    from sqlalchemy import text
+    session.execute(text("DELETE FROM election_history WHERE election_type='市議員'"))
+    session.commit()
+    
     # 1. 建立行政區 (選區)
     for county, l_id in loc_dict.items():
         if county == "全國": continue
@@ -94,38 +99,33 @@ def populate_councilors():
         for dist_name in county_districts:
             dist_loc = session.query(Location).filter_by(name=dist_name, parent_id=l_id).first()
             if not dist_loc:
-                from sqlalchemy import text
-                # 取得最大的 ID
                 max_id = session.execute(text("SELECT MAX(id) FROM locations")).scalar() or 0
                 dist_id = max_id + 1
-                # 使用純 SQL 寫入，避開 ORM 的 sequence bug
                 session.execute(text("INSERT INTO locations (id, name, level, parent_id) VALUES (:i, :n, :l, :p)"),
                                 {"i": dist_id, "n": dist_name, "l": "district", "p": l_id})
                 session.commit()
             else:
                 dist_id = dist_loc.id
             
-            # 刪除舊的議員資料
-            session.query(ElectionHistory).filter_by(location_id=dist_id, election_type="市議員").delete()
-            
             # 寫入議員資料
             for c_info in councilor_data[county][dist_name]:
                 # 在姓名後加上 (連任) 或 (新任) 標記，前端可以直接顯示
                 name_display = f"{c_info['name']} {'(連任)' if c_info['is_incumbent'] else '(新任)'}"
-                record = ElectionHistory(
-                    location_id=dist_id,
-                    year=2022,
-                    election_type="市議員",
-                    candidate_name=name_display,
-                    party=c_info['party'],
-                    votes=c_info['votes'],
-                    vote_percentage=round(c_info['votes'] / 100000 * 100, 2), # 近似值
-                    is_elected=1 # 都是當選者
-                )
-                all_records.append(record)
                 
-    session.bulk_save_objects(all_records)
+                max_eh_id = session.execute(text("SELECT MAX(id) FROM election_history")).scalar() or 0
+                eh_id = max_eh_id + 1
+                vp = round(c_info['votes'] / 100000 * 100, 2)
+                
+                session.execute(text("""
+                    INSERT INTO election_history (id, location_id, year, election_type, candidate_name, party, votes, vote_percentage, is_elected)
+                    VALUES (:i, :l, 2022, '市議員', :n, :p, :v, :vp, 1)
+                """), {
+                    "i": eh_id, "l": dist_id, "n": name_display, "p": c_info['party'], "v": c_info['votes'], "vp": vp
+                })
+                all_records.append(name_display)
+                
     session.commit()
+    
     session.close()
     
     print(f"[{datetime.datetime.now()}] 全台現任縣市議員資料庫建立完成！共寫入 {len(all_records)} 位議員。")
